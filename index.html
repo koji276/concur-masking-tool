@@ -231,6 +231,9 @@
                 <li>「マスク済み画像をコピー」ボタンをクリック</li>
                 <li><a href="https://chatgpt.com/g/g-6907dc0e2e0c8191983067011b7d1f46-concur-helper-faq-expense2" target="_blank">Concur Helper</a> に貼り付け</li>
             </ol>
+            <p style="margin-top:8px; font-size:13px; color:#555;">
+                🎯 補足: クリップボードにコピーしたスクリーンショットは、このページ上で <strong>Ctrl+V / ⌘+V</strong> すると自動で読み込まれます。
+            </p>
         </div>
         
         <div class="upload-area" id="uploadArea">
@@ -306,8 +309,10 @@
         let startX, startY;
         let currentMode = 'auto';
         
+        // クリックでファイル選択
         uploadArea.addEventListener('click', () => fileInput.click());
         
+        // ドラッグ&ドロップ
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -326,6 +331,7 @@
             }
         });
         
+        // ファイル選択
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -333,6 +339,26 @@
             }
         });
         
+        // 🔥 追加：クリップボードからのペースト対応
+        document.addEventListener('paste', (event) => {
+            const items = event.clipboardData && event.clipboardData.items;
+            if (!items) return;
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type && item.type.indexOf('image') === 0) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        loadImage(file);
+                        event.preventDefault();
+                        showStatus('クリップボードから画像を読み込みました', 'success');
+                    }
+                    return; // 最初の画像だけ処理
+                }
+            }
+        });
+        
+        // モード切り替え
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -355,6 +381,7 @@
                     controls.style.display = 'flex';
                     modeSelector.style.display = 'flex';
                     maskedRegions = [];
+                    detectedInfo.style.display = 'none';
                     
                     showStatus('画像を読み込みました', 'success');
                 };
@@ -404,13 +431,16 @@
                     detectedInfo.style.display = 'block';
                     showStatus(`${detectedCount}箇所をマスキングしました`, 'success');
                 } else {
+                    detectedInfo.style.display = 'none';
                     showStatus('機密情報は検出されませんでした', 'info');
                 }
             } catch (error) {
+                console.error(error);
                 showStatus('自動検出に失敗しました。手動モードをお試しください。', 'info');
             }
         });
         
+        // 手動マスキング
         canvas.addEventListener('mousedown', (e) => {
             if (currentMode !== 'manual') return;
             isDrawing = true;
@@ -450,304 +480,7 @@
                     height: Math.abs(height)
                 });
                 redrawMasks();
-            }
-        });
-        
-        function maskRegion(x, y, width, height) {
-            maskedRegions.push({ x, y, width, height });
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-            ctx.fillRect(x, y, width, height);
-        }
-        
-        function redrawMasks() {
-            ctx.drawImage(currentImage, 0, 0);
-            maskedRegions.forEach(region => {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                ctx.fillRect(region.x, region.y, region.width, region.height);
-            });
-        }
-        
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            if (maskedRegions.length > 0) {
-                maskedRegions.pop();
-                redrawMasks();
-                showStatus('最後のマスキングを取り消しました', 'info');
-            }
-        });
-        
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            maskedRegions = [];
-            ctx.drawImage(currentImage, 0, 0);
-            detectedInfo.style.display = 'none';
-            showStatus('すべてのマスキングをクリアしました', 'info');
-        });
-        
-        document.getElementById('copyBtn').addEventListener('click', async () => {
-            try {
-                const blob = await new Promise(resolve => canvas.toBlob(resolve));
-                await navigator.clipboard.write([
-                    new ClipboardItem({ 'image/png': blob })
-                ]);
-                showStatus('✅ クリップボードにコピーしました！Concur Helperに貼り付けてください', 'success');
-            } catch (error) {
-                showStatus('コピーに失敗しました。ダウンロードをお試しください。', 'info');
-            }
-        });
-        
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'masked_screenshot.png';
-            link.href = canvas.toDataURL();
-            link.click();
-            showStatus('画像をダウンロードしました', 'success');
-        });
-        
-        function showStatus(message, type) {
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-            setTimeout(() => {
-                status.style.display = 'none';
-            }, 5000);
-        }
-    </script>
-</body>
-</html>
-
-<body>
-    <div class="container">
-        <header>
-            <h1>🔒 画像マスキングツール</h1>
-            <p class="subtitle">Concur Helper用 - 機密情報を自動検出・マスキング</p>
-        </header>
-        
-        <div class="instructions">
-            <h3>使い方</h3>
-            <ol>
-                <li>画面のスクリーンショットを撮影</li>
-                <li>下のエリアに画像をドラッグ&ドロップ（またはクリックして選択）</li>
-                <li>自動検出モードで機密情報を検出、または手動でマスキング</li>
-                <li>「マスク済み画像をコピー」ボタンをクリック</li>
-                <li><a href="https://chatgpt.com/g/g-6907dc0e2e0c8191983067011b7d1f46-concur-helper-faq-expense2" target="_blank">Concur Helper</a> に貼り付け</li>
-            </ol>
-        </div>
-        
-        <div class="upload-area" id="uploadArea">
-            <p style="font-size: 48px; margin-bottom: 10px;">📸</p>
-            <p style="font-size: 18px; font-weight: 600; margin-bottom: 5px;">
-                画像をドラッグ&ドロップ
-            </p>
-            <p style="color: #666;">またはクリックしてファイルを選択</p>
-            <input type="file" id="fileInput" accept="image/*" style="display: none;">
-        </div>
-        
-        <div class="mode-selector" id="modeSelector" style="display: none;">
-            <div class="mode-btn active" data-mode="auto">
-                <strong>🤖 自動検出モード</strong>
-                <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                    金額、メールアドレス等を自動検出
-                </p>
-            </div>
-            <div class="mode-btn" data-mode="manual">
-                <strong>✏️ 手動マスキング</strong>
-                <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                    クリック&ドラッグでマスキング
-                </p>
-            </div>
-        </div>
-        
-        <div class="detected-info" id="detectedInfo"></div>
-        
-        <canvas id="canvas"></canvas>
-        
-        <div class="status" id="status"></div>
-        
-        <div class="controls" id="controls" style="display: none;">
-            <button class="btn-primary" id="autoDetectBtn">
-                🔍 自動検出実行
-            </button>
-            <button class="btn-secondary" id="undoBtn">
-                ↶ 元に戻す
-            </button>
-            <button class="btn-danger" id="clearBtn">
-                🗑️ すべてクリア
-            </button>
-            <button class="btn-success" id="copyBtn">
-                📋 マスク済み画像をコピー
-            </button>
-            <button class="btn-secondary" id="downloadBtn">
-                💾 ダウンロード
-            </button>
-        </div>
-        
-        <footer>
-            <p>
-                完全ブラウザ内処理 | 画像は外部送信されません | 
-                <a href="https://github.com/koji276/concur-masking-tool" target="_blank">GitHub</a> | 
-                Made by <a href="https://fusiondriver.jp" target="_blank">FUSIONDRIVER</a>
-            </p>
-        </footer>
-    </div>
-
-    <script>
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const controls = document.getElementById('controls');
-        const status = document.getElementById('status');
-        const modeSelector = document.getElementById('modeSelector');
-        const detectedInfo = document.getElementById('detectedInfo');
-        
-        let currentImage = null;
-        let maskedRegions = [];
-        let isDrawing = false;
-        let startX, startY;
-        let currentMode = 'auto';
-        
-        uploadArea.addEventListener('click', () => fileInput.click());
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                loadImage(file);
-            }
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                loadImage(file);
-            }
-        });
-        
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentMode = btn.dataset.mode;
-            });
-        });
-        
-        function loadImage(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    currentImage = img;
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    canvas.style.display = 'block';
-                    controls.style.display = 'flex';
-                    modeSelector.style.display = 'flex';
-                    maskedRegions = [];
-                    
-                    showStatus('画像を読み込みました', 'success');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        document.getElementById('autoDetectBtn').addEventListener('click', async () => {
-            showStatus('自動検出中... しばらくお待ちください', 'info');
-            
-            try {
-                const result = await Tesseract.recognize(canvas, 'jpn+eng', {
-                    logger: m => console.log(m)
-                });
-                
-                const patterns = {
-                    'メールアドレス': /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
-                    '電話番号': /\d{2,4}-\d{2,4}-\d{4}/g,
-                    '金額': /[¥$€]\s?\d{1,3}(,\d{3})*/g,
-                    'クレジットカード': /\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/g,
-                };
-                
-                let detectedCount = 0;
-                let detectedTypes = [];
-                
-                result.data.words.forEach(word => {
-                    const text = word.text;
-                    
-                    for (const [type, pattern] of Object.entries(patterns)) {
-                        if (pattern.test(text)) {
-                            const bbox = word.bbox;
-                            maskRegion(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-                            detectedCount++;
-                            if (!detectedTypes.includes(type)) {
-                                detectedTypes.push(type);
-                            }
-                        }
-                    }
-                });
-                
-                if (detectedCount > 0) {
-                    detectedInfo.innerHTML = `
-                        <strong>✅ ${detectedCount}箇所の機密情報を検出しました</strong><br>
-                        検出タイプ: ${detectedTypes.join(', ')}
-                    `;
-                    detectedInfo.style.display = 'block';
-                    showStatus(`${detectedCount}箇所をマスキングしました`, 'success');
-                } else {
-                    showStatus('機密情報は検出されませんでした', 'info');
-                }
-            } catch (error) {
-                showStatus('自動検出に失敗しました。手動モードをお試しください。', 'info');
-            }
-        });
-        
-        canvas.addEventListener('mousedown', (e) => {
-            if (currentMode !== 'manual') return;
-            isDrawing = true;
-            const rect = canvas.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
-        });
-        
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing || currentMode !== 'manual') return;
-            const rect = canvas.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
-            
-            ctx.drawImage(currentImage, 0, 0);
-            redrawMasks();
-            
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(startX, startY, currentX - startX, currentY - startY);
-        });
-        
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDrawing || currentMode !== 'manual') return;
-            isDrawing = false;
-            const rect = canvas.getBoundingClientRect();
-            const endX = e.clientX - rect.left;
-            const endY = e.clientY - rect.top;
-            
-            const width = endX - startX;
-            const height = endY - startY;
-            
-            if (Math.abs(width) > 5 && Math.abs(height) > 5) {
-                maskedRegions.push({
-                    x: Math.min(startX, endX),
-                    y: Math.min(startY, endY),
-                    width: Math.abs(width),
-                    height: Math.abs(height)
-                });
+            } else {
                 redrawMasks();
             }
         });
@@ -776,7 +509,9 @@
         
         document.getElementById('clearBtn').addEventListener('click', () => {
             maskedRegions = [];
-            ctx.drawImage(currentImage, 0, 0);
+            if (currentImage) {
+                ctx.drawImage(currentImage, 0, 0);
+            }
             detectedInfo.style.display = 'none';
             showStatus('すべてのマスキングをクリアしました', 'info');
         });
@@ -789,6 +524,7 @@
                 ]);
                 showStatus('✅ クリップボードにコピーしました！Concur Helperに貼り付けてください', 'success');
             } catch (error) {
+                console.error(error);
                 showStatus('コピーに失敗しました。ダウンロードをお試しください。', 'info');
             }
         });
